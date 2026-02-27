@@ -1,0 +1,16 @@
+# Ambientes Virtuais
+venv/
+env/
+.venv/
+
+# Variáveis de Ambiente (NUNCA comite este arquivo)
+.env
+
+# Arquivos gerados pelo script
+imagens_noticias/
+*.csv
+*.txt
+
+# Python
+__pycache__/
+*.pyc
