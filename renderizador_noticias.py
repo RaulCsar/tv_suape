@@ -5,7 +5,7 @@ from PIL import Image, ImageDraw, ImageFont
 # Configurações da TV
 TV_WIDTH = 1920
 TV_HEIGHT = 1080
-OUTPUT_DIR = "imagens_tv"
+OUTPUT_DIR = "public/imagens_tv"
 
 def preparar_imagem_tv(caminho_imagem, texto_manchete):
     """
