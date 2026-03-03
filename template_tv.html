@@ -25,10 +25,7 @@
             overflow: hidden;
             background-color: transparent !important;
             /* Fundo da aplicação */
-            background-image: url('identidade_suape/suapeDesktop.png') !important;
-            background-size: cover !important;
-            background-position: center !important;
-            background-repeat: no-repeat !important;
+            background-color: black !important;
         }
 
         .reveal .backgrounds {
@@ -73,6 +70,16 @@
             background-color: transparent !important;
         }
 
+        .area-interativa-botao {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 300px;
+            height: 200px;
+            z-index: 9998;
+            /* Usado apenas para capturar o mouse, não visível */
+        }
+
         .btn-fullscreen {
             position: absolute;
             bottom: 30px;
@@ -86,11 +93,20 @@
             font-size: 16px;
             cursor: pointer;
             border-radius: 5px;
-            transition: background-color 0.3s;
+            opacity: 0; /* Começa invisível */
+            transition: opacity 0.5s ease, background-color 0.3s ease;
+            pointer-events: none; /* Evita cliques quando invisível */
         }
 
         .btn-fullscreen:hover {
             background-color: rgba(0, 0, 0, 0.8);
+        }
+
+        /* Quando a área interativa detecta o mouse, o botão fica visível */
+        .area-interativa-botao:hover + .btn-fullscreen,
+        .btn-fullscreen:hover {
+            opacity: 1;
+            pointer-events: auto; /* Permite cliques */
         }
     </style>
 </head>
@@ -99,6 +115,9 @@
     <!-- Logo fixa no canto superior esquerdo -->
     <img src="identidade_suape/logoSuape.png" alt="Logo Suape" class="logo-canto">
 
+    <!-- Área invisível para detectar o mouse no canto -->
+    <div class="area-interativa-botao"></div>
+    
     <!-- Botão de Tela Cheia -->
     <button id="btn-fullscreen" class="btn-fullscreen" onclick="toggleFullScreen()">⛶ Tela Cheia</button>
 
