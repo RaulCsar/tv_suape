@@ -15,17 +15,24 @@
 
     <style>
         body,
-        html {
+        html, 
+        .reveal-viewport,
+        .reveal {
             margin: 0;
             padding: 0;
             width: 100vw;
             height: 100vh;
             overflow: hidden;
-            background-color: black;
+            background-color: transparent !important;
             /* Fundo da aplicação */
-            background-image: url('identidade_suape/suapeDesktop.png');
-            background-size: cover;
-            background-position: center;
+            background-image: url('identidade_suape/suapeDesktop.png') !important;
+            background-size: cover !important;
+            background-position: center !important;
+            background-repeat: no-repeat !important;
+        }
+
+        .reveal .backgrounds {
+            background-color: transparent !important;
         }
 
         .logo-canto {
