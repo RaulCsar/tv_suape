@@ -60,19 +60,29 @@ def preparar_imagem_tv(caminho_imagem, texto_manchete):
     img = Image.alpha_composite(img, overlay)
 
     # 3. Configurar a Fonte e o Texto
-    # Garante que teremos uma fonte renderizável (baixa a fonte Roboto caso não tenha)
+    # Garante que teremos uma fonte renderizável (tenta carregar da pasta local primeiro)
     import urllib.request
     
     tamanho_fonte = 60
-    font_path = "Roboto-Regular.ttf"
     
+    # Procura prioritariamente pela pasta de fontes embutida no repositório
+    font_dir = os.path.join(os.path.dirname(__file__), "fonts")
+    if not os.path.exists(font_dir):
+        os.makedirs(font_dir, exist_ok=True)
+        
+    font_path = os.path.join(font_dir, "Matt-Regular.ttf")
+    
+    # Fallback automático caso o usuário não tenha a fonte Matt no repositório
     if not os.path.exists(font_path):
         try:
-            print("Baixando fonte da internet para garantir texto legível no Vercel...")
-            url_fonte = "https://github.com/googlefonts/roboto/raw/main/src/hinted/Roboto-Regular.ttf"
-            urllib.request.urlretrieve(url_fonte, font_path)
+            print("Aviso: Fonte Matt não encontrada no projeto.")
+            print("Baixando fonte Roboto com fallback provisório da internet...")
+            font_path = os.path.join(font_dir, "Roboto-Regular.ttf")
+            if not os.path.exists(font_path):
+                url_fonte = "https://github.com/googlefonts/roboto/raw/main/src/hinted/Roboto-Regular.ttf"
+                urllib.request.urlretrieve(url_fonte, font_path)
         except Exception as e:
-            print(f"Erro ao baixar a fonte: {e}")
+            print(f"Erro ao baixar a fonte de fallback: {e}")
 
     try:
         fonte = ImageFont.truetype(font_path, tamanho_fonte)
