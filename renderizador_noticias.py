@@ -60,17 +60,27 @@ def preparar_imagem_tv(caminho_imagem, texto_manchete):
     img = Image.alpha_composite(img, overlay)
 
     # 3. Configurar a Fonte e o Texto
-    # Tenta carregar uma fonte padrão do sistema (Arial no Windows, Liberation Sans no Linux/Vercel)
-    # Se não encontrar, usa a fonte padrão do PIL (que não suporta tamanho)
+    # Garante que teremos uma fonte renderizável (baixa a fonte Roboto caso não tenha)
+    import urllib.request
+    
     tamanho_fonte = 60
+    font_path = "Roboto-Regular.ttf"
+    
+    if not os.path.exists(font_path):
+        try:
+            print("Baixando fonte da internet para garantir texto legível no Vercel...")
+            url_fonte = "https://github.com/googlefonts/roboto/raw/main/src/hinted/Roboto-Regular.ttf"
+            urllib.request.urlretrieve(url_fonte, font_path)
+        except Exception as e:
+            print(f"Erro ao baixar a fonte: {e}")
+
     try:
-        # Tenta Arial (Windows) primeiro, depois Liberation Sans (Linux/Vercel)
-        fonte = ImageFont.truetype("arial.ttf", tamanho_fonte)
+        fonte = ImageFont.truetype(font_path, tamanho_fonte)
     except IOError:
         try:
-            fonte = ImageFont.truetype("/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf", tamanho_fonte)
+            fonte = ImageFont.truetype("arial.ttf", tamanho_fonte)
         except IOError:
-            print("Aviso: Fontes TrueType não encontradas. Usando fonte padrão (pequena).")
+            print("Aviso: Nenhuma fonte TrueType funcionou. Usando padrão.")
             fonte = ImageFont.load_default()
 
     # Prepara o objeto de desenho na imagem final
