@@ -60,15 +60,18 @@ def preparar_imagem_tv(caminho_imagem, texto_manchete):
     img = Image.alpha_composite(img, overlay)
 
     # 3. Configurar a Fonte e o Texto
-    # Tenta carregar uma fonte padrão do sistema (Arial no Windows)
+    # Tenta carregar uma fonte padrão do sistema (Arial no Windows, Liberation Sans no Linux/Vercel)
     # Se não encontrar, usa a fonte padrão do PIL (que não suporta tamanho)
     tamanho_fonte = 60
     try:
-        # Caminho comum para a fonte Arial no Windows
+        # Tenta Arial (Windows) primeiro, depois Liberation Sans (Linux/Vercel)
         fonte = ImageFont.truetype("arial.ttf", tamanho_fonte)
     except IOError:
-        print("Aviso: Fonte Arial não encontrada. Usando fonte padrão (pequena).")
-        fonte = ImageFont.load_default()
+        try:
+            fonte = ImageFont.truetype("/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf", tamanho_fonte)
+        except IOError:
+            print("Aviso: Fontes TrueType não encontradas. Usando fonte padrão (pequena).")
+            fonte = ImageFont.load_default()
 
     # Prepara o objeto de desenho na imagem final
     draw = ImageDraw.Draw(img)

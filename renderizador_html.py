@@ -50,8 +50,9 @@ class PainelRenderer:
             for img in imagens:
                 # Resolve caminhos relativos ao arquivo final HTML
                 caminho_relativo = img.absolute().relative_to(cwd_relativo_ao_html)
-                # Garante formato com barras normais independente de SO (Windows usa contra-barra)
-                paths_relativos.append(caminho_relativo.as_posix())
+                # Garante formato com barras normais independente de SO (Windows usa contra-barra) e remove 'public/' se existir
+                path_str = caminho_relativo.as_posix()
+                paths_relativos.append(path_str)
         except ValueError as e:
             logger.error(f"Erro de resolução de caminhos relativos: {e}")
             return []
