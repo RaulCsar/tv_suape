@@ -23,7 +23,7 @@
             overflow: hidden;
             background-color: black;
             /* Fundo da aplicação */
-            background-image: url('identidade_suape/suapeDesktop.img');
+            background-image: url('identidade_suape/suapeDesktop.png');
             background-size: cover;
             background-position: center;
         }
@@ -70,13 +70,13 @@
 
 <body>
     <!-- Logo fixa no canto superior esquerdo -->
-    <img src="identidade_suape/logo_suape.png" alt="Logo Suape" class="logo-canto">
+    <img src="identidade_suape/logoSuape.png" alt="Logo Suape" class="logo-canto">
 
     <div class="reveal">
         <div class="slides">
             {% if images %}
             {% for image in images %}
-            <section data-background-image="{{ image }}"></section>
+            <section data-background-image="{{ image }}" data-background-size="contain"></section>
             {% endfor %}
             {% else %}
             <section>
