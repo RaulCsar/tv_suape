@@ -22,6 +22,20 @@
             height: 100vh;
             overflow: hidden;
             background-color: black;
+            /* Fundo da aplicação */
+            background-image: url('identidade_suape/suapeDesktop.img');
+            background-size: cover;
+            background-position: center;
+        }
+
+        .logo-canto {
+            position: absolute;
+            top: 30px;
+            left: 30px;
+            z-index: 9999;
+            max-width: 250px; /* Ajuste o tamanho da logo conforme necessário */
+            height: auto;
+            pointer-events: none; /* Para não interferir caso alguém clique na tela */
         }
 
         .reveal {
@@ -48,17 +62,21 @@
             background-size: contain;
             background-position: center;
             background-repeat: no-repeat;
+            /* Deixa o fundo do slide transparente para mostrar o background-image do body na lateral */
+            background-color: transparent !important;
         }
     </style>
 </head>
 
 <body>
+    <!-- Logo fixa no canto superior esquerdo -->
+    <img src="identidade_suape/logo_suape.png" alt="Logo Suape" class="logo-canto">
+
     <div class="reveal">
         <div class="slides">
             {% if images %}
             {% for image in images %}
-            <section data-background-image="{{ image }}" data-background-size="contain" data-background-color="black">
-            </section>
+            <section data-background-image="{{ image }}"></section>
             {% endfor %}
             {% else %}
             <section>

@@ -42,8 +42,8 @@ def preparar_imagem_tv(caminho_imagem, texto_manchete):
     img = img.resize((TV_WIDTH, TV_HEIGHT), Image.Resampling.LANCZOS)
 
     # 2. Criar a tarja semi-transparente
-    # Altura da tarja (ajuste conforme necessário, ex: 250 pixels)
-    tarja_height = 250
+    # Altura da tarja (ajustada para ficar menor e ocupar menos a imagem)
+    tarja_height = 180
     tarja_y_start = TV_HEIGHT - tarja_height
 
     # Cria uma nova imagem transparente para desenhar a tarja
