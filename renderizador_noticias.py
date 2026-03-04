@@ -2,6 +2,8 @@ import os
 import textwrap
 from PIL import Image, ImageDraw, ImageFont
 
+import httpx
+
 # Configurações da TV
 TV_WIDTH = 1920
 TV_HEIGHT = 1080
@@ -61,8 +63,6 @@ def preparar_imagem_tv(caminho_imagem, texto_manchete):
 
     # 3. Configurar a Fonte e o Texto
     # Garante que teremos uma fonte renderizável (tenta carregar da pasta local primeiro)
-    import urllib.request
-    
     tamanho_fonte = 60
     
     # Procura prioritariamente pela pasta de fontes embutida no repositório
@@ -79,10 +79,13 @@ def preparar_imagem_tv(caminho_imagem, texto_manchete):
             print("Baixando fonte Roboto com fallback provisório da internet...")
             font_path = os.path.join(font_dir, "Roboto-Regular.ttf")
             if not os.path.exists(font_path):
-                url_fonte = "https://github.com/googlefonts/roboto/raw/main/src/hinted/Roboto-Regular.ttf"
-                urllib.request.urlretrieve(url_fonte, font_path)
-        except Exception as e:
-            print(f"Erro ao baixar a fonte de fallback: {e}")
+                URL_FONTE = "https://github.com/googlefonts/roboto/raw/main/src/hinted/Roboto-Regular.ttf"
+                response = httpx.get(URL_FONTE, follow_redirects=True)
+                response.raise_for_status()
+                with open(font_path, "wb") as f:
+                    f.write(response.content)
+        except (httpx.RequestError, IOError) as e:
+            print(f"Erro ao baixar ou salvar a fonte de fallback: {e}")
 
     try:
         fonte = ImageFont.truetype(font_path, tamanho_fonte)

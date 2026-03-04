@@ -1,7 +1,7 @@
 import os
 import re
 import csv
-import requests
+import httpx
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 from pathlib import Path
@@ -23,10 +23,10 @@ def main():
     print(f"Acessando a página: {PAGE_URL}")
     try:
         # Faz a requisição para a página principal
-        response = requests.get(PAGE_URL, timeout=10)
+        response = httpx.get(PAGE_URL, timeout=10)
         response.raise_for_status()
         response.encoding = 'utf-8' # Força UTF-8
-    except requests.RequestException as e:
+    except httpx.RequestError as e:
         print(f"Erro ao acessar a página principal: {e}")
         return
 
@@ -84,12 +84,12 @@ def main():
 
             # 3. Faz o download da imagem com tratamento de exceções
             try:
-                img_response = requests.get(img_url, stream=True, timeout=10)
-                img_response.raise_for_status()
-                
-                with open(img_filepath, 'wb') as img_file:
-                    for chunk in img_response.iter_content(chunk_size=8192):
-                        img_file.write(chunk)
+                with httpx.stream("GET", img_url, timeout=10, follow_redirects=True) as img_response:
+                    img_response.raise_for_status()
+                    
+                    with open(img_filepath, 'wb') as img_file:
+                        for chunk in img_response.iter_bytes(chunk_size=8192):
+                            img_file.write(chunk)
                 status_imagem = "Salva com sucesso"
                 
                 # 3.1. Prepara a imagem para a TV
@@ -100,7 +100,7 @@ def main():
                 else:
                     status_imagem += " (Erro ao formatar para TV)"
                     
-            except requests.RequestException as e:
+            except httpx.RequestError as e:
                 print(f"[{index}] Erro ao baixar a imagem {img_url}: {e}")
                 status_imagem = "Erro no download"
                 img_filepath = ""

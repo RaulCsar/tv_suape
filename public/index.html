@@ -15,13 +15,31 @@
 
     <style>
         body,
-        html {
+        html, 
+        .reveal-viewport,
+        .reveal {
             margin: 0;
             padding: 0;
             width: 100vw;
             height: 100vh;
             overflow: hidden;
-            background-color: black;
+            background-color: transparent !important;
+            /* Fundo da aplicação */
+            background-color: black !important;
+        }
+
+        .reveal .backgrounds {
+            background-color: transparent !important;
+        }
+
+        .logo-canto {
+            position: absolute;
+            top: 30px;
+            left: 30px;
+            z-index: 9999;
+            max-width: 250px; /* Ajuste o tamanho da logo conforme necessário */
+            height: auto;
+            pointer-events: none; /* Para não interferir caso alguém clique na tela */
         }
 
         .reveal {
@@ -48,29 +66,76 @@
             background-size: contain;
             background-position: center;
             background-repeat: no-repeat;
+            /* Deixa o fundo do slide transparente para mostrar o background-image do body na lateral */
+            background-color: transparent !important;
+        }
+
+        .area-interativa-botao {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 300px;
+            height: 200px;
+            z-index: 9998;
+            /* Usado apenas para capturar o mouse, não visível */
+        }
+
+        .btn-fullscreen {
+            position: absolute;
+            bottom: 30px;
+            right: 30px;
+            z-index: 9999;
+            background-color: rgba(0, 0, 0, 0.5);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            padding: 10px 20px;
+            font-family: sans-serif;
+            font-size: 16px;
+            cursor: pointer;
+            border-radius: 5px;
+            opacity: 0; /* Começa invisível */
+            transition: opacity 0.5s ease, background-color 0.3s ease;
+            pointer-events: none; /* Evita cliques quando invisível */
+        }
+
+        .btn-fullscreen:hover {
+            background-color: rgba(0, 0, 0, 0.8);
+        }
+
+        /* Quando a área interativa detecta o mouse, o botão fica visível */
+        .area-interativa-botao:hover + .btn-fullscreen,
+        .btn-fullscreen:hover {
+            opacity: 1;
+            pointer-events: auto; /* Permite cliques */
         }
     </style>
 </head>
 
 <body>
+    <!-- Logo fixa no canto superior esquerdo -->
+    <img src="identidade_suape/logoSuape.png" alt="Logo Suape" class="logo-canto">
+
+    <!-- Área invisível para detectar o mouse no canto -->
+    <div class="area-interativa-botao"></div>
+    
+    <!-- Botão de Tela Cheia -->
+    <button id="btn-fullscreen" class="btn-fullscreen" onclick="toggleFullScreen()">⛶ Tela Cheia</button>
+
     <div class="reveal">
         <div class="slides">
             
             
-            <section data-background-image="imagens_tv/tv_Suape_6º_porto_público_mais_movimentado_do_país_mantém_liderança_na_movimentação_de_granéis_líquidos.JPG" data-background-size="contain" data-background-color="black">
-            </section>
+            <section data-background-image="imagens_tv/tv_Suape_6º_porto_público_mais_movimentado_do_país_mantém_liderança_na_movimentação_de_granéis_líquidos.JPG" data-background-size="contain"></section>
             
-            <section data-background-image="imagens_tv/tv_Suape_abre_2026_com_crescimento_de_386_e_reforça_protagonismo_logístico_no_Nordeste.jpg" data-background-size="contain" data-background-color="black">
-            </section>
+            <section data-background-image="imagens_tv/tv_Suape_abre_2026_com_crescimento_de_386_e_reforça_protagonismo_logístico_no_Nordeste.jpg" data-background-size="contain"></section>
             
-            <section data-background-image="imagens_tv/tv_Suape_conquista_bicampeonato_ambiental_e_lidera_ranking_nacional_da_Antaq.jpeg" data-background-size="contain" data-background-color="black">
-            </section>
+            <section data-background-image="imagens_tv/tv_Suape_acelera_internacionalização_no_Sudeste_Asiático.jpeg" data-background-size="contain"></section>
             
-            <section data-background-image="imagens_tv/tv_Suape_estabelece_cooperação_técnica_com_gigantes_portuários_da_Malásia.jpeg" data-background-size="contain" data-background-color="black">
-            </section>
+            <section data-background-image="imagens_tv/tv_Suape_conquista_bicampeonato_ambiental_e_lidera_ranking_nacional_da_Antaq.jpeg" data-background-size="contain"></section>
             
-            <section data-background-image="imagens_tv/tv_Suape_realiza_missão_no_Sudeste_Asiático_para_ampliar_investimentos_e_atrair_novas_rotas_marítimas.jpeg" data-background-size="contain" data-background-color="black">
-            </section>
+            <section data-background-image="imagens_tv/tv_Suape_estabelece_cooperação_técnica_com_gigantes_portuários_da_Malásia.jpeg" data-background-size="contain"></section>
+            
+            <section data-background-image="imagens_tv/tv_Suape_realiza_missão_no_Sudeste_Asiático_para_ampliar_investimentos_e_atrair_novas_rotas_marítimas.jpeg" data-background-size="contain"></section>
             
             
         </div>
@@ -92,6 +157,23 @@
             minScale: 1,
             maxScale: 1
         });
+
+        function toggleFullScreen() {
+            var doc = window.document;
+            var docEl = doc.documentElement;
+
+            var requestFullScreen = docEl.requestFullscreen || docEl.mozRequestFullScreen || docEl.webkitRequestFullScreen || docEl.msRequestFullscreen;
+            var cancelFullScreen = doc.exitFullscreen || doc.mozCancelFullScreen || doc.webkitExitFullscreen || doc.msExitFullscreen;
+
+            if (!doc.fullscreenElement && !doc.mozFullScreenElement && !doc.webkitFullscreenElement && !doc.msFullscreenElement) {
+                requestFullScreen.call(docEl);
+                document.getElementById('btn-fullscreen').innerHTML = "✖ Sair da Tela Cheia";
+            }
+            else {
+                cancelFullScreen.call(doc);
+                document.getElementById('btn-fullscreen').innerHTML = "⛶ Tela Cheia";
+            }
+        }
     </script>
 </body>
 
