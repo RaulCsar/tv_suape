@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+    <title>TV Suape - Digital Signage</title>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/5.0.4/reset.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/5.0.4/reveal.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/5.0.4/theme/black.min.css">
+
+    <style>
+        .reveal .slides section img {
+            max-height: 100vh;
+            max-width: 100vw;
+            margin: 0;
+            border: none;
+            box-shadow: none;
+        }
+        .reveal.center .slides section {
+            text-align: center;
+        }
+        /* Remover bordas e backgrounds de imagens da classe base do reveal */
+        .reveal section img { background: none; }
+    </style>
+</head>
+<body>
+    <div class="reveal">
+        <div class="slides">
+            <!-- Capa ou Video Inicial -->
+            <section data-autoslide="5000">
+                <h2>TV SUAPE</h2>
+                <p>Notícias Atuais: {{ news_items|length }}</p>
+                <p>As atualizações mais recentes sobre o Porto.</p>
+            </section>
+
+            <!-- Slides das Notícias -->
+            {% for news in news_items %}
+            <section data-autoslide="10000" data-background-image="assets/news/{{ news.local_image_name }}" data-background-size="cover">
+                <!-- A imagem e textos principais já vieram embutidos da Pillow via imagem background.
+                     Se quiser colocar animações em textos, o Pillow não é necessário e faria aqui.
+                     Porém a arquitetura solicitada foi text wrap e overlay pelo Pillow e enviar WebP. -->
+            </section>
+            {% endfor %}
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/5.0.4/reveal.min.js"></script>
+    <script>
+        // Inicialização do Reveal.js
+        Reveal.initialize({
+            hash: true,
+            autoSlide: 10000,
+            loop: true,
+            transition: 'fade', // transições suaves
+            controls: false, // Ocultar controles pra versão totem
+            progress: false, // Ocultar barra de progresso
+        });
+        
+        // Em um Digital Signage de verdade, a cada X minutos faremos reload
+        // para buscar a nova versão que a Pipeline no Vercel gerou.
+        setTimeout(() => {
+            window.location.reload();
+        }, 12 * 60 * 60 * 1000); // Exemplo: recarrega pag inteira a cada 12 horas.
+    </script>
+</body>
+</html>

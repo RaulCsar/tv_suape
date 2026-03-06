@@ -2,59 +2,64 @@
 
 ## 1. Visão Geral
 
-O `tv_suape` é um sistema de Digital Signage (Mural Digital) desenvolvido para exibir as notícias mais recentes do Complexo Industrial Portuário de Suape em uma Smart TV de forma automatizada.
+O `tv_suape` é um sistema de Digital Signage (Mural Digital) refatorado para exibir as notícias mais recentes do Complexo Industrial Portuário de Suape de forma automatizada. O sistema é projetado para ser resiliente, eficiente e de fácil manutenção.
 
 O sistema funciona como um pipeline que:
-1.  **Extrai** (via Web Scraping) as manchetes e imagens do portal de notícias de Suape.
-2.  **Processa** as imagens, adicionando as manchetes sobre elas em um formato de TV (1920x1080).
-3.  **Renderiza** uma página web estática (HTML) que exibe as imagens em um carrossel de slides automático.
-4.  **Disponibiliza** a página para ser acessada por uma TV, com atualização automática do conteúdo.
+1.  **Extrai** notícias de múltiplas fontes (LinkedIn via Playwright e Site Institucional como fallback).
+2.  **Processa** as manchetes sobre as imagens de fundo usando Pillow, otimizando-as para a web (WebP).
+3.  **Renderiza** um site estático com Reveal.js e Jinja2, criando um carrossel de slides.
+4.  **Automatiza** todo o processo com GitHub Actions, que executa o pipeline, commita as novas imagens e aciona o deploy na Vercel.
 
-O projeto foi projetado para ser hospedado na Vercel, com um processo de CI/CD que automatiza a atualização das notícias.
+O projeto foi projetado para ser hospedado na Vercel, com um processo de CI/CD totalmente automatizado.
 
 ## 2. Arquitetura e Fluxo de Dados
 
-O pipeline é orquestrado pelo script principal `scraper.py` e dividido nas seguintes etapas:
+O pipeline é orquestrado pelo `src/main.py` e segue os princípios SOLID, com clara separação de responsabilidades.
 
-![Fluxograma do Pipeline de Dados](https-placeholder-for-diagram)
+1.  **CI/CD (GitHub Actions)**:
+    *   Um agendamento (`cron`) executa o workflow a cada 6 horas.
+    *   O job instala as dependências, incluindo os navegadores do Playwright.
+    *   Executa o orquestrador `src/main.py`.
+    *   Commita e envia as alterações (novas imagens e `index.html`) para a branch principal, acionando o deploy na Vercel.
 
-1.  **Extração (`scraper.py`)**:
-    *   Acessa a página de notícias do Porto de Suape.
-    *   Utiliza `BeautifulSoup` para parsear o HTML e encontrar os cards de notícia.
-    *   Para cada card, extrai a URL da imagem e a manchete.
-    *   Faz o download da imagem original para uma pasta temporária.
+2.  **Orquestrador (`src/main.py`)**:
+    *   Limpa o cache de imagens antigas em `assets/news/`.
+    *   Instancia e executa os scrapers (`LinkedInSuapeScraper` e `SiteSuapeScraper`).
+    *   Unifica e remove notícias duplicadas.
+    *   Invoca o `ImageProcessor` para cada notícia.
+    *   Invoca o `StaticSiteRenderer` para gerar o `index.html`.
 
-2.  **Processamento de Imagem (`renderizador_noticias.py`)**:
-    *   A imagem baixada é redimensionada e cortada para a proporção 16:9 (1920x1080).
-    *   Uma tarja preta semi-transparente é adicionada na parte inferior da imagem.
-    *   A manchete é escrita sobre a tarja, com quebra de linha automática e centralização.
-    *   A imagem final é salva no diretório `public/imagens_tv/`.
+3.  **Camada de Extração (`src/scrapers/`)**:
+    *   `base.py`: Define a interface `Scraper` que todos os scrapers devem implementar (DIP).
+    *   `linkedin_scraper.py`: Usa Playwright para acessar o LinkedIn de forma autenticada (via cookie em `secrets`) e extrair posts.
+    *   `site_scraper.py`: Usa `httpx` e `BeautifulSoup4` para extrair notícias do site institucional como alternativa.
 
-3.  **Renderização HTML (`renderizador_html.py`)**:
-    *   O módulo lê todas as imagens processadas do diretório `public/imagens_tv/`.
-    *   Utiliza `Jinja2` para injetar a lista de caminhos de imagem no template `template_tv.html`.
-    *   O resultado é um arquivo `index.html` final, salvo no diretório `public`.
+4.  **Camada de Engine (`src/engine/`)**:
+    *   `processor.py`: Baixa a imagem, recorta para 16:9, aplica um gradiente e renderiza a manchete com `textwrap`. Salva em formato WebP em `assets/news/`.
+    *   `renderer.py`: Usa `Jinja2` para renderizar o `templates/index.html.j2` com a lista de imagens geradas, criando o `index.html` na raiz.
 
-4.  **Apresentação (Frontend)**:
-    *   O arquivo `public/index.html` utiliza o framework `Reveal.js` para criar uma apresentação de slides em tela cheia.
-    *   **Configurações**: Transição "fade", auto-slide a cada 10 segundos e loop infinito.
-    *   A página possui uma meta tag de `refresh` que a recarrega a cada 1 hora para buscar conteúdo novo que tenha sido atualizado no servidor.
+## 3. Estrutura do Projeto (Arquitetura Alvo)
 
-## 3. Estrutura do Projeto
-
-```
-/
-├── public/                     # Diretório de saída para a Vercel (site estático)
-│   ├── imagens_tv/             # Imagens processadas com manchetes
-│   └── index.html              # Página final renderizada
-├── scraper.py                  # Script principal que orquestra todo o pipeline
-├── renderizador_noticias.py    # Módulo para processar e legendar as imagens
-├── renderizador_html.py        # Módulo para gerar o HTML final com base no template
-├── template_tv.html            # Template Jinja2 para a apresentação com Reveal.js
-├── build.sh                    # Script de build para o ambiente da Vercel
-├── vercel.json                 # Configuração de deploy da Vercel
-├── requirements.txt            # Dependências Python
-└── README.md                   # Esta documentação
+```plaintext
+tv_suape/
+├── .github/workflows/sync_pipeline.yml # Workflow de CI/CD
+├── src/
+│   ├── scrapers/
+│   │   ├── base.py                     # Interface do Scraper (ABC)
+│   │   ├── site_scraper.py             # Scraper do site institucional
+│   │   └── linkedin_scraper.py         # Scraper do LinkedIn (Playwright)
+│   ├── engine/
+│   │   ├── processor.py                # Processador de Imagens (Pillow)
+│   │   └── renderer.py                 # Renderizador de HTML (Jinja2)
+│   └── main.py                         # Orquestrador do Pipeline
+├── assets/
+│   ├── news/                           # Destino das imagens processadas (cache)
+│   └── fonts/                          # Fontes TrueType (ex: Roboto-Bold.ttf)
+├── templates/
+│   └── index.html.j2                   # Template HTML com Reveal.js
+├── .env.example                        # Exemplo de variáveis de ambiente
+├── requirements.txt                    # Dependências Python
+└── index.html                          # Arquivo final gerado, deployado pela Vercel
 ```
 
 ## 4. Como Executar Localmente
