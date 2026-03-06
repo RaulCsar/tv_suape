@@ -1,22 +1,16 @@
+import logging
 from abc import ABC, abstractmethod
-from typing import List, Dict, Any
+from typing import Dict, List
 
-class BaseScraper(ABC):
+
+class Scraper(ABC):
     """
-    Interface base para os scrapers de notícias.
-    Garante que todos os scrapers obedeçam a um contrato unificado.
+    Interface abstrata (Protocolo) para todos os Scrapers.
+    Define um contrato único para a obtenção de notícias, garantindo que
+    o orquestrador possa tratar diferentes fontes de dados de forma uniforme.
     """
-    
+
     @abstractmethod
-    def get_news(self) -> List[Dict[str, Any]]:
-        """
-        Extrai as notícias.
-        
-        Returns:
-            List[Dict[str, Any]]: Uma lista de dicionários, sendo que cada
-            dicionário deve conter no mínimo as chaves:
-                - title (str): Título ou manchete
-                - image_url (str): URL da imagem
-                - source (str): Fonte da notícia (ex: 'Site Oficial', 'LinkedIn')
-        """
+    def get_news(self) -> List[Dict[str, str]]:
+        """Extrai notícias de uma fonte de dados e as retorna."""
         pass

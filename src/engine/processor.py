@@ -1,109 +1,102 @@
 import logging
-import requests
 import textwrap
 from pathlib import Path
-from typing import Dict, Any, Optional
 from io import BytesIO
+
+import httpx
 from PIL import Image, ImageDraw, ImageFont
 
-logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
 
 class ImageProcessor:
-    def __init__(self, output_dir: Path, target_size: tuple = (1920, 1080)):
-        self.output_dir = output_dir
-        self.target_size = target_size
-        self._ensure_output_dir()
-        
-    def _ensure_output_dir(self):
-        self.output_dir.mkdir(parents=True, exist_ok=True)
-        
-    def _create_gradient(self, width: int, height: int, start_color: tuple, end_color: tuple) -> Image.Image:
-        """Cria um gradiente vertical."""
-        base = Image.new('RGBA', (width, height), start_color)
-        top = Image.new('RGBA', (width, height), end_color)
-        mask = Image.new('L', (width, height))
-        mask_data = []
-        for y in range(height):
-            mask_data.extend([int(255 * (y / height))] * width)
-        mask.putdata(mask_data)
-        base.paste(top, (0, 0), mask)
-        return base
+    """
+    Responsável por processar uma imagem: baixar, redimensionar, aplicar
+    efeitos e renderizar texto sobre ela.
+    """
 
-    def process_news_item(self, news: Dict[str, Any], index: int) -> Optional[str]:
+    def __init__(self, output_dir: Path, font_path: Path | None = None, tv_width: int = 1920, tv_height: int = 1080):
+        self.output_dir = output_dir
+        self.tv_width = tv_width
+        self.tv_height = tv_height
+        self.font_path = font_path
+        self.font_size = 60
+        self.font = self._load_font()
+
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+
+    def _load_font(self) -> ImageFont.FreeTypeFont:
+        """Carrega a fonte TrueType, com fallback para uma fonte padrão."""
+        if self.font_path:
+            try:
+                return ImageFont.truetype(str(self.font_path), self.font_size)
+            except IOError:
+                logging.warning(f"Fonte '{self.font_path}' não encontrada. Usando fonte padrão da Pillow.")
+        else:
+            logging.info("Nenhum caminho de fonte especificado. Usando fonte padrão da Pillow.")
+        return ImageFont.load_default()
+
+    def process_image(self, image_url: str, headline: str, output_filename: str) -> Path | None:
         """
-        Baixa a imagem, aplica resize/crop, adiciona o gradiente na base, 
-        renderiza o texto formatado (wrap text) e salva em WebP.
+        Orquestra o download e processamento completo de uma imagem.
+        Retorna o caminho do arquivo salvo ou None em caso de falha.
         """
         try:
-            logger.info(f"Processando imagem para: '{news['title'][:30]}...'")
-            response = requests.get(news['image_url'], timeout=15)
-            response.raise_for_status()
-            
-            img = Image.open(BytesIO(response.content)).convert("RGBA")
-            
-            # Redimensionar / Crop centralizado
-            img_aspect = img.width / img.height
-            target_aspect = self.target_size[0] / self.target_size[1]
-            
-            if img_aspect > target_aspect:
-                # Imagem muito larga
-                new_width = int(img.height * target_aspect)
-                left = (img.width - new_width) / 2
-                img = img.crop((left, 0, left + new_width, img.height))
-            elif img_aspect < target_aspect:
-                # Imagem muito alta
-                new_height = int(img.width / target_aspect)
-                top = (img.height - new_height) / 2
-                img = img.crop((0, top, img.width, top + new_height))
-                
-            img = img.resize(self.target_size, Image.Resampling.LANCZOS)
-            
-            # Criar a sobreposição do gradiente na parte inferior (40% da imagem)
-            gradient_height = int(self.target_size[1] * 0.4)
-            gradient = self._create_gradient(
-                self.target_size[0], gradient_height, 
-                (0, 0, 0, 0), (0, 0, 0, 220)
-            )
-            img.paste(gradient, (0, self.target_size[1] - gradient_height), gradient)
-            
-            # Escrever o título da notícia
-            draw = ImageDraw.Draw(img)
-            # Tentar carregar fonte, usar fonte default se não encontrar TTF system
-            try:
-                # Pode apontar para uma fonte em assets se necessário
-                font = ImageFont.truetype("arialbd.ttf", 60)
-            except IOError:
-                font = ImageFont.load_default(size=40)
-            
-            # Text Wrap para evitar ultrapassar bordas
-            margin = 80
-            max_width = self.target_size[0] - 2 * margin
-            wrapped_text = textwrap.fill(news['title'], width=50) # TBD largura baseada no ttf
-            
-            # Calcular o tamanho do texto (box) aproximado
-            bbox = draw.textbbox((0, 0), wrapped_text, font=font)
-            text_height = bbox[3] - bbox[1]
-            
-            # Posicionar perto da base
-            text_x = margin
-            text_y = self.target_size[1] - text_height - 60
-            
-            # Sombra simples
-            draw.text((text_x + 3, text_y + 3), wrapped_text, font=font, fill=(0, 0, 0, 180))
-            draw.text((text_x, text_y), wrapped_text, font=font, fill=(255, 255, 255, 255))
-            
-            output_filename = f"slide_{index:02d}.webp"
-            output_filepath = self.output_dir / output_filename
-            
-            final_img = img.convert("RGB") # WebP não necessita alpha no nosso caso estático
-            final_img.save(output_filepath, format="WEBP", quality=85, method=6)
-            
-            logger.info(f"Salvo sucesso: {output_filepath}")
-            return output_filepath.name
-                
-        except requests.RequestException as e:
-            logger.error(f"Erro no download da imagem {news['image_url']}: {e}")
+            with httpx.stream("GET", image_url, timeout=20.0, follow_redirects=True) as response:
+                response.raise_for_status()
+                image_data = response.read()
+
+            with Image.open(BytesIO(image_data)).convert("RGBA") as img:
+                # 1. Redimensionar e Recortar (Crop) para 16:9
+                target_ratio = self.tv_width / self.tv_height
+                img_ratio = img.width / img.height
+
+                if img_ratio > target_ratio:
+                    new_width = int(target_ratio * img.height)
+                    offset = (img.width - new_width) // 2
+                    img = img.crop((offset, 0, img.width - offset, img.height))
+                elif img_ratio < target_ratio:
+                    new_height = int(img.width / target_ratio)
+                    offset = (img.height - new_height) // 2
+                    img = img.crop((0, offset, img.width, img.height - offset))
+
+                img = img.resize((self.tv_width, self.tv_height), Image.Resampling.LANCZOS)
+
+                # 2. Aplicar gradiente escuro na base
+                gradient = Image.new('L', (1, self.tv_height), color=0xFF)
+                for y in range(self.tv_height):
+                    gradient.putpixel((0, y), int(255 * (1 - max(0, (y - self.tv_height * 0.6)) / (self.tv_height * 0.4))))
+                alpha = gradient.resize(img.size)
+                black_bg = Image.new('RGBA', img.size, color=(0, 0, 0, 255))
+                img = Image.composite(img, black_bg, alpha)
+
+                # 3. Renderizar texto
+                draw = ImageDraw.Draw(img)
+                wrapped_text = textwrap.wrap(headline, width=55)
+
+                # Cálculo da posição do texto
+                line_height = self.font.getbbox("A")[3] - self.font.getbbox("A")[1]
+                total_text_height = len(wrapped_text) * line_height * 1.2
+                y_text = self.tv_height - total_text_height - 60
+
+                for line in wrapped_text:
+                    bbox = draw.textbbox((0, 0), line, font=self.font)
+                    line_width = bbox[2] - bbox[0]
+                    x_text = (self.tv_width - line_width) / 2
+                    draw.text((x_text, y_text), line, font=self.font, fill="white")
+                    y_text += line_height * 1.2
+
+                # 4. Salvar em formato otimizado
+                output_path = self.output_dir / f"{output_filename}.webp"
+                img.convert("RGB").save(output_path, "WEBP", quality=85)
+                logging.info(f"Imagem processada e salva em: {output_path}")
+                return output_path
+
+        except httpx.RequestError as e:
+            logging.error(f"Falha ao baixar a imagem {image_url}: {e}")
+        except IOError as e:
+            logging.error(f"Falha ao processar a imagem de {image_url} com Pillow: {e}")
         except Exception as e:
-            logger.exception(f"Erro ao processar a imagem da notícia '{news['title']}': {e}")
-            
+            logging.error(f"Erro inesperado ao processar {image_url}: {e}", exc_info=True)
+
         return None

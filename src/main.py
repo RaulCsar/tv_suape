@@ -1,120 +1,99 @@
 import logging
-import sys
 import shutil
 from pathlib import Path
-from typing import List, Dict
+from typing import Dict, List
+
 from dotenv import load_dotenv
 
-# Carrega ambiente
-load_dotenv()
+from engine.processor import ImageProcessor
+from engine.renderer import StaticSiteRenderer
+from scrapers.base import Scraper
+from scrapers.linkedin_scraper import LinkedInSuapeScraper
+from scrapers.site_scraper import SiteSuapeScraper
 
-from src.scrapers.site_scraper import SiteSuapeScraper
-from src.scrapers.linkedin_scraper import LinkedInSuapeScraper
-from src.engine.processor import ImageProcessor
-from src.engine.renderer import HTMLRenderer
-from src.engine.summarizer import NewsSummarizer
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# Configuração de Logs
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[logging.StreamHandler(sys.stdout)]
-)
-logger = logging.getLogger(__name__)
 
-# Diretórios baseados no Local do Script
-BASE_DIR = Path(__file__).resolve().parent.parent
-ASSETS_DIR = BASE_DIR / "assets" / "news"
-TEMPLATES_DIR = BASE_DIR / "templates"
-PUBLIC_DIR = BASE_DIR / "public"
+class Pipeline:
+    """Orquestra o pipeline completo: extração, processamento e renderização."""
 
-def pre_clear_cache(directory: Path):
-    """Eficiência: Purge do cache de imagens antigas."""
-    logger.info(f"Limpando diretório do cache em {directory}")
-    if directory.exists():
-        for file in directory.iterdir():
-            if file.is_file():
-                try:
-                    file.unlink()
-                except Exception as e:
-                    logger.error(f"Erro ao deletar o arquivo {file}: {e}")
-    else:
-        directory.mkdir(parents=True, exist_ok=True)
+    def __init__(self, scrapers: List[Scraper], processor: ImageProcessor, renderer: StaticSiteRenderer):
+        self.scrapers = scrapers
+        self.processor = processor
+        self.renderer = renderer
 
-def deduplicate_news(news_list: List[Dict]) -> List[Dict]:
-    """Remove conteúdo com títulos duplicados antes do processamento."""
-    seen_titles = set()
-    unique = []
-    for item in news_list:
-        norm_title = item['title'].strip().lower()
-        if norm_title not in seen_titles:
-            unique.append(item)
-            seen_titles.add(norm_title)
-    return unique
+    def _fetch_news(self) -> List[Dict[str, str]]:
+        """Busca notícias de todos os scrapers e unifica os resultados."""
+        all_news = []
+        for scraper in self.scrapers:
+            try:
+                news = scraper.get_news()
+                all_news.extend(news)
+            except Exception as e:
+                logging.error(f"Falha ao executar scraper {type(scraper).__name__}: {e}", exc_info=True)
 
-def main():
-    logger.info("=== Iniciando Pipeline do TV Suape ===")
-    
-    # 1. Limpeza do Cache
-    pre_clear_cache(ASSETS_DIR)
-    
-    # 2. Execução dos Scrapers (Camada de Extração)
-    scrapers = [
-        SiteSuapeScraper(),
-        LinkedInSuapeScraper()
-    ]
-    
-    all_news = []
-    for scraper in scrapers:
-        try:
-            news = scraper.get_news()
-            all_news.extend(news)
-        except Exception as e:
-            logger.error(f"Scraper falhou: {e}")
-            
-    # Remove duplicates
-    unique_news = deduplicate_news(all_news)
-    
-    # Ordenação das notícias: Site Oficial primeiro, depois LinkedIn
-    unique_news.sort(key=lambda x: 0 if x.get('source') == 'Site Oficial' else 1)
-    
-    logger.info(f"Total de notícias unificadas e deduplicadas: {len(unique_news)}")
-    # 2.5 Resumo por IA das Manchetes
-    summarizer = NewsSummarizer()
-    for news in unique_news:
-        if len(news['title']) > 100:
-            logger.info(f"Resumindo texto longo da fonte {news['source']}...")
-            news['title'] = summarizer.summarize_title(news['title'])
-    
-    # 
-    # 3. Processamento de Imagem (Camada Pillow)
-    processor = ImageProcessor(output_dir=ASSETS_DIR)
-    processed_news_list = []
-    
-    index = 1
-    for news in unique_news:
-        # Se retornar arquivo processado válido, armazena no array que vai pro template
-        filename = processor.process_news_item(news, index)
-        if filename:
-            news_copy = news.copy()
-            news_copy['local_image_name'] = filename
-            processed_news_list.append(news_copy)
-            index += 1
-            
-    # Copia as imagens processadas para pasta pública apenas pro Vercel renderizar, 
-    # ou os acessa via caminho relativo
-    pub_assets = PUBLIC_DIR / "assets" / "news"
-    pre_clear_cache(pub_assets)
-    shutil.copytree(ASSETS_DIR, pub_assets, dirs_exist_ok=True)
-            
-    # 4. Renderização (Camada HTML/Jinja2)
-    renderer = HTMLRenderer(
-        template_dir=TEMPLATES_DIR,
-        output_file=PUBLIC_DIR / "index.html"
-    )
-    renderer.render(processed_news_list)
-    
-    logger.info("=== Pipeline concluída com sucesso ===")
+        # Remove duplicatas baseadas na URL da imagem, mantendo a primeira ocorrência
+        unique_news = []
+        seen_urls = set()
+        for item in all_news:
+            if item["image_url"] not in seen_urls:
+                unique_news.append(item)
+                seen_urls.add(item["image_url"])
+
+        logging.info(f"Total de {len(unique_news)} notícias únicas encontradas.")
+        return unique_news
+
+    def _purge_cache(self, directory: Path):
+        """Limpa o diretório de cache (imagens antigas)."""
+        logging.info(f"Limpando cache de imagens em: {directory}")
+        if directory.exists():
+            for item in directory.iterdir():
+                if item.is_file():
+                    item.unlink()
+                elif item.is_dir():
+                    shutil.rmtree(item)
+
+    def run(self):
+        """Executa o pipeline completo."""
+        logging.info("Iniciando pipeline da TV Suape.")
+
+        # 1. Limpeza do cache
+        self._purge_cache(self.processor.output_dir)
+
+        # 2. Extração de dados
+        news_items = self._fetch_news()
+        if not news_items:
+            logging.warning("Nenhuma notícia foi encontrada. O pipeline será encerrado.")
+            return
+
+        # 3. Processamento de imagens
+        processed_images = []
+        for i, item in enumerate(news_items):
+            # Gera um nome de arquivo simples e único
+            output_filename = f"news_{i:02d}"
+            processed_path = self.processor.process_image(item["image_url"], item["headline"], output_filename)
+            if processed_path:
+                processed_images.append(processed_path)
+
+        # 4. Renderização do site estático
+        if processed_images:
+            self.renderer.render(image_paths=processed_images)
+        else:
+            logging.warning("Nenhuma imagem foi processada. O site estático não será gerado.")
+
+        logging.info("Pipeline da TV Suape finalizado.")
+
 
 if __name__ == "__main__":
-    main()
+    load_dotenv()  # Carrega variáveis de ambiente do arquivo .env
+
+    # Configuração das dependências (Injeção de Dependência)
+    ROOT_DIR = Path(__file__).parent.parent
+    ASSETS_DIR = ROOT_DIR / "assets"
+
+    scrapers_to_run = [LinkedInSuapeScraper(), SiteSuapeScraper()]
+    image_processor = ImageProcessor(output_dir=ASSETS_DIR / "news")
+    site_renderer = StaticSiteRenderer(template_dir=ROOT_DIR / "templates", template_name="index.html.j2", output_path=ROOT_DIR / "index.html")
+
+    pipeline = Pipeline(scrapers=scrapers_to_run, processor=image_processor, renderer=site_renderer)
+    pipeline.run()

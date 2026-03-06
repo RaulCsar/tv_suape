@@ -1,103 +1,80 @@
-import os
+import json
 import logging
-from typing import List, Dict, Any
-from dotenv import load_dotenv
+import os
+from typing import Dict, List
+
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
-from .base import BaseScraper
 
-# Carrega as variáveis de ambiente do .env na raiz do projeto (se existir)
-load_dotenv()
+from .base import Scraper
 
-logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-class LinkedInSuapeScraper(BaseScraper):
-    def __init__(self, page_url: str = "https://www.linkedin.com/company/complexo-industrial-portu%C3%A1rio-de-suape/"):
-        self.page_url = page_url
-        self.cookie = os.getenv("LINKEDIN_COOKIE")
 
-    def get_news(self) -> List[Dict[str, Any]]:
-        if not self.cookie:
-            logger.warning("Variável de ambiente LINKEDIN_COOKIE não definida. Scraper poderá falhar ou exigir login.")
-            
+class LinkedInSuapeScraper(Scraper):
+    """
+    Scraper para extrair posts da página do LinkedIn do Porto de Suape usando Playwright.
+    Requer um cookie de autenticação para evitar bloqueios.
+    """
+
+    def __init__(self, profile_url: str = "https://www.linkedin.com/company/complexo-industrial-portu%C3%A1rio-de-suape/posts"):
+        self.profile_url = profile_url
+        self.linkedin_cookie = os.getenv("LINKEDIN_COOKIE")
+
+    def get_news(self) -> List[Dict[str, str]]:
+        """
+        Acessa a página de posts, injeta o cookie e extrai as notícias mais recentes.
+        """
+        if not self.linkedin_cookie:
+            logging.warning("Variável de ambiente LINKEDIN_COOKIE não definida. Pulando scraper do LinkedIn.")
+            return []
+
+        logging.info(f"Iniciando scraping do LinkedIn: {self.profile_url}")
         news_list = []
+
         try:
-            logger.info("Iniciando scraper do LinkedIn via Playwright.")
             with sync_playwright() as p:
                 browser = p.chromium.launch(headless=True)
-                context = browser.new_context(
-                    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-                )
-                
-                if self.cookie:
-                    context.add_cookies([
-                        {
-                            "name": "li_at",
-                            "value": self.cookie,
-                            "domain": ".linkedin.com",
-                            "path": "/",
-                            "secure": True,
-                            "httpOnly": True
-                        }
-                    ])
-                
-                page = context.new_page()
-                page.set_default_timeout(30000)
-                page.goto(self.page_url, wait_until="domcontentloaded")
-                
-                # Aguarda o feed principal aparecer
-                try:
-                    page.wait_for_selector(".feed-shared-update-v2", timeout=15000)
-                except PlaywrightTimeoutError:
-                    logger.error("Tempo limite excedido aguardando o feed do LinkedIn. Tirando screenshot e salvando HTML para debug.")
-                    page.screenshot(path="linkedin_debug.png")
-                    with open("linkedin_debug.html", "w", encoding="utf-8") as f:
-                        f.write(page.content())
-                    logger.error("Verifique linkedin_debug.png e linkedin_debug.html na raiz.")
-                    return news_list
-                
-                posts = page.locator(".feed-shared-update-v2").all()[:5]
-                
-                for post in posts:
-                    try:
-                        # Seletores ajustados conforme DOM do LinkedIn. Usamos `.first` para resolver casos de "strict mode violation" onde ele acha múltiplas divs aninhadas
-                        text_loc = post.locator(".feed-shared-update-v2__description, .update-components-text").first
-                        img_loc = post.locator(".update-components-image__image").first
-                        
-                        title = text_loc.inner_text().strip() if text_loc.count() > 0 else ""
-                        img_url = img_loc.get_attribute("src") if img_loc.count() > 0 else None
-                        
-                        # Retiramos o encurtamento prematuro aqui! O texto original completo será passado 
-                        # para o LLM gerar uma manchete real e inteligente antes da engine.
-                        
-                        if title and img_url:
-                            news_list.append({
-                                "title": title,
-                                "image_url": img_url,
-                                "source": "LinkedIn"
-                            })
-                    except Exception as e:
-                        logger.warning(f"Erro ao processar um post específico do LinkedIn: {e}")
-                        continue
-                
-                browser.close()
-                logger.info(f"Coletadas {len(news_list)} do LinkedIn.")
-        except Exception as e:
-            logger.exception(f"Erro inesperado no scraper do LinkedIn: {e}")
-            
-        return news_list
+                context = browser.new_context()
 
-if __name__ == "__main__":
-    import json
-    
-    # Configuração de logging apenas para este teste
-    logging.basicConfig(level=logging.INFO)
-    
-    scraper = LinkedInSuapeScraper()
-    print("Iniciando testes no scraper do LinkedIn...")
-    try:
-        resultados = scraper.get_news()
-        print(json.dumps(resultados, indent=2, ensure_ascii=False))
-        if not resultados:
-            print("\nNenhum resultado obtido. Verifique se o selector CSS mudou, se você tomou shadow ban ou se precisa definir a .env com LINKEDIN_COOKIE")
-    except Exception as exc:
-        print(f"Erro ao testar LinkedIn: {exc}")
+                # Injeta o cookie de sessão
+                cookie = {
+                    "name": "li_at",
+                    "value": self.linkedin_cookie,
+                    "domain": ".linkedin.com",
+                    "path": "/",
+                }
+                context.add_cookies([cookie])
+
+                page = context.new_page()
+                page.goto(self.profile_url, wait_until="domcontentloaded", timeout=60000)
+
+                # Aguarda os posts carregarem
+                page.wait_for_selector("div.update-components-actor__title", timeout=30000)
+
+                posts = page.locator("div.feed-shared-update-v2").all()
+                if not posts:
+                    logging.warning("Nenhum post encontrado no LinkedIn. A estrutura pode ter mudado.")
+                    return []
+
+                for post in posts[:5]:  # Limita aos 5 posts mais recentes
+                    try:
+                        headline_element = post.locator("div.feed-shared-update-v2__description-wrapper").first
+                        headline = headline_element.inner_text(timeout=5000).strip()
+
+                        image_element = post.locator("img.update-components-image__image").first
+                        image_url = image_element.get_attribute("src")
+
+                        if headline and image_url:
+                            news_list.append({"headline": headline, "image_url": image_url})
+                    except PlaywrightTimeoutError:
+                        logging.warning("Timeout ao extrair dados de um post individual do LinkedIn. Pulando.")
+                        continue
+
+                browser.close()
+        except PlaywrightTimeoutError:
+            logging.error("Timeout geral ao carregar a página do LinkedIn. Verifique a conexão ou o seletor.")
+        except Exception as e:
+            logging.error(f"Erro inesperado no scraper do LinkedIn: {e}", exc_info=True)
+
+        logging.info(f"Scraper do LinkedIn encontrou {len(news_list)} notícias.")
+        return news_list

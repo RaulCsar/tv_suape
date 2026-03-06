@@ -1,68 +1,86 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt-br">
+
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <!-- Atualização automática da página a cada 1 hora (3600 segundos) -->
+    <meta http-equiv="refresh" content="3600">
 
-    <title>TV Suape - Digital Signage</title>
+    <title>Mural Digital - SUAPE</title>
 
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/5.0.4/reset.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/5.0.4/reveal.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/5.0.4/theme/black.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reset.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/theme/black.min.css">
 
     <style>
-        .reveal .slides section img {
-            max-height: 100vh;
-            max-width: 100vw;
+        body,
+        html {
             margin: 0;
-            border: none;
-            box-shadow: none;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            background-color: #000; /* Fundo preto para evitar flash branco */
         }
-        .reveal.center .slides section {
-            text-align: center;
+
+        .reveal {
+            width: 100vw;
+            height: 100vh;
         }
-        /* Remover bordas e backgrounds de imagens da classe base do reveal */
-        .reveal section img { background: none; }
+
+        .reveal .slides {
+            width: 100% !important;
+            height: 100% !important;
+            transform: none !important;
+            margin: 0 !important;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+
+        .reveal .slides section {
+            width: 100%;
+            height: 100%;
+            padding: 0;
+            margin: 0;
+            top: 0 !important;
+        }
+
+        .full-screen-img {
+            object-fit: cover;
+            width: 100vw;
+            height: 100vh;
+            display: block;
+            margin: 0;
+            max-width: none !important;
+            max-height: none !important;
+        }
     </style>
 </head>
+
 <body>
     <div class="reveal">
         <div class="slides">
-            <!-- Capa ou Video Inicial -->
-            <section data-autoslide="5000">
-                <h2>TV SUAPE</h2>
-                <p>Notícias Atuais: {{ news_items|length }}</p>
-                <p>As atualizações mais recentes sobre o Porto.</p>
+            {% for image_path in images %}
+            <section>
+                <img class="full-screen-img" src="{{ image_path }}" alt="Notícia Suape">
             </section>
-
-            <!-- Slides das Notícias -->
-            {% for news in news_items %}
-            <section data-autoslide="10000" data-background-image="assets/news/{{ news.local_image_name }}" data-background-size="cover">
-                <!-- A imagem e textos principais já vieram embutidos da Pillow via imagem background.
-                     Se quiser colocar animações em textos, o Pillow não é necessário e faria aqui.
-                     Porém a arquitetura solicitada foi text wrap e overlay pelo Pillow e enviar WebP. -->
+            {% else %}
+            <section>
+                <h2>Aguardando notícias...</h2>
             </section>
             {% endfor %}
         </div>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/5.0.4/reveal.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.js"></script>
     <script>
-        // Inicialização do Reveal.js
         Reveal.initialize({
-            hash: true,
-            autoSlide: 10000,
-            loop: true,
-            transition: 'fade', // transições suaves
-            controls: false, // Ocultar controles pra versão totem
-            progress: false, // Ocultar barra de progresso
+            hash: false, controls: false, progress: false, center: false,
+            transition: 'fade', autoSlide: {{ slide_duration_ms | default(10000) }}, loop: true,
+            width: '100%', height: '100%', margin: 0, minScale: 1, maxScale: 1
         });
-        
-        // Em um Digital Signage de verdade, a cada X minutos faremos reload
-        // para buscar a nova versão que a Pipeline no Vercel gerou.
-        setTimeout(() => {
-            window.location.reload();
-        }, 12 * 60 * 60 * 1000); // Exemplo: recarrega pag inteira a cada 12 horas.
     </script>
 </body>
 </html>
