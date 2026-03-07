@@ -12,7 +12,10 @@ __pycache__/
 # Ambientes virtuais
 venv/
 .venv/
-*.env
+# Ambientes
+.env
+.env.local
+.env.*
 # Arquivos de sessão (boa prática)
 session-*
 
