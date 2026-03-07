@@ -17,7 +17,7 @@ class LinkedInSuapeScraper(Scraper):
     Requer um cookie de autenticação para evitar bloqueios.
     """
 
-    def __init__(self, profile_url: str = "https://www.linkedin.com/company/complexo-industrial-portu%C3%A1rio-de-suape/posts"):
+    def __init__(self, profile_url: str = "https://www.linkedin.com/company/complexo-industrial-portu%C3%A1rio-de-suape/posts/?feedView=images"):
         self.profile_url = profile_url
         self.linkedin_cookie = os.getenv("LINKEDIN_COOKIE")
         self.gemini_api_key = os.getenv("GEMINI_API_KEY")
@@ -33,7 +33,7 @@ class LinkedInSuapeScraper(Scraper):
         try:
             prompt = f"Resuma o seguinte texto de uma postagem do LinkedIn em uma única frase de impacto curta (máximo 15 palavras), como uma manchete de TV (em português). Remova aspas e quebras de linha: {text}"
             response = self.genai_client.models.generate_content(
-                model='gemini-1.5-flash',
+                model='gemini-2.5-flash',
                 contents=prompt
             )
             if response.text:
@@ -71,21 +71,33 @@ class LinkedInSuapeScraper(Scraper):
                 page = context.new_page()
                 page.goto(self.profile_url, wait_until="domcontentloaded", timeout=60000)
 
-                # Aguarda os posts carregarem
-                page.wait_for_selector("div.update-components-actor__title", timeout=30000)
+                # scroll 3 vezes para carregar os posts
+                for _ in range(3):
+                    page.evaluate("window.scrollBy(0, 1000)")
+                    page.wait_for_timeout(2000)
 
                 posts = page.locator("div.feed-shared-update-v2").all()
                 if not posts:
                     logging.warning("Nenhum post encontrado no LinkedIn. A estrutura pode ter mudado.")
                     return []
 
-                for post in posts[:5]:  # Limita aos 5 posts mais recentes
+                for idx, post in enumerate(posts[:5]):  # Limita aos 5 posts mais recentes
                     try:
-                        headline_element = post.locator("div.feed-shared-update-v2__description-wrapper").first
-                        headline = headline_element.inner_text(timeout=5000).strip()
+                        # Busca o texto na nova estrutura do LinkedIn
+                        headline_element = post.locator(".update-components-text, .update-components-update-v2__commentary")
+                        if headline_element.count() > 0:
+                            headline = headline_element.first.inner_text(timeout=5000).strip()
+                        else:
+                            headline = ""
 
-                        image_element = post.locator("img.update-components-image__image").first
-                        image_url = image_element.get_attribute("src")
+                        # Busca todas as imagens e extrai a primeira que seja conteúdo do post
+                        image_url = ""
+                        imgs = post.locator("img").all()
+                        for img in imgs:
+                            src = img.get_attribute("src")
+                            if src and "company-logo" not in src and "emoji" not in src and "dms/image" in src:
+                                image_url = src
+                                break
 
                         if headline and image_url:
                             headline_summary = self._summarize_with_gemini(headline)

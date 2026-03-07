@@ -1,9 +1,9 @@
 gemini.md
 
 # Arquivos gerados pelo projeto
-# A pasta 'public' contém os artefatos finais (imagens e HTML)
-# e é gerada a cada execução do script, não devendo ser versionada.
-public/
+public/assets/
+public/index.html
+.vercel/
 
 # Cache e arquivos compilados do Python
 __pycache__/
@@ -19,3 +19,4 @@ venv/
 # Arquivos de sessão (boa prática)
 session-*
 
+.vercel

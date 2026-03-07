@@ -32,16 +32,10 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: python src/main.py
 
-      - name: 6. Fazer Commit das alterações (imagens e index.html)
+      - name: 6. Deploy Direto no Vercel
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
         run: |
-          git config --global user.name 'GitHub Actions Bot'
-          git config --global user.email 'actions-bot@github.com'
-          git add -A
-          # Verifica se há algo para comitar para evitar erro no workflow
-          if git diff --staged --quiet; then
-            echo "Nenhuma alteração para comitar."
-          else
-            git commit -m "chore(AUTOMATION): Atualiza notícias e imagens da TV Suape"
-            git push
-          fi
-        # O push para a branch principal irá acionar o deploy automático da Vercel.
+          npm i -g vercel
+          vercel deploy --prod --token=${{ secrets.VERCEL_TOKEN }} --yes
