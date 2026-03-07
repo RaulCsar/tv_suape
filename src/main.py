@@ -89,11 +89,19 @@ if __name__ == "__main__":
 
     # Configuração das dependências (Injeção de Dependência)
     ROOT_DIR = Path(__file__).parent.parent
-    ASSETS_DIR = ROOT_DIR / "assets"
+    PUBLIC_DIR = ROOT_DIR / "public"
+    ASSETS_DIR = PUBLIC_DIR / "assets"
+    
+    # Garantir que a estrutura exista
+    PUBLIC_DIR.mkdir(parents=True, exist_ok=True)
+    ASSETS_DIR.mkdir(parents=True, exist_ok=True)
+    (ASSETS_DIR / "news").mkdir(parents=True, exist_ok=True)
+
+    FONT_PATH = PUBLIC_DIR / "fonts" / "matt-font-family" / "Matt_Trial-Bold-BF670897ed2aebd.ttf"
 
     scrapers_to_run = [LinkedInSuapeScraper(), SiteSuapeScraper()]
-    image_processor = ImageProcessor(output_dir=ASSETS_DIR / "news")
-    site_renderer = StaticSiteRenderer(template_dir=ROOT_DIR / "templates", template_name="index.html.j2", output_path=ROOT_DIR / "index.html")
+    image_processor = ImageProcessor(output_dir=ASSETS_DIR / "news", font_path=FONT_PATH)
+    site_renderer = StaticSiteRenderer(template_dir=ROOT_DIR / "templates", template_name="index.html.j2", output_path=PUBLIC_DIR / "index.html")
 
     pipeline = Pipeline(scrapers=scrapers_to_run, processor=image_processor, renderer=site_renderer)
     pipeline.run()

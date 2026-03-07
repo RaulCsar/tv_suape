@@ -29,6 +29,7 @@ jobs:
       - name: 5. Executar o Pipeline de Sincronização
         env:
           LINKEDIN_COOKIE: ${{ secrets.LINKEDIN_COOKIE }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: python src/main.py
 
       - name: 6. Fazer Commit das alterações (imagens e index.html)

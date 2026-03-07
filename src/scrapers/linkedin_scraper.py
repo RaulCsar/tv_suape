@@ -3,6 +3,7 @@ import logging
 import os
 from typing import Dict, List
 
+from google import genai
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 
 from .base import Scraper
@@ -19,6 +20,28 @@ class LinkedInSuapeScraper(Scraper):
     def __init__(self, profile_url: str = "https://www.linkedin.com/company/complexo-industrial-portu%C3%A1rio-de-suape/posts"):
         self.profile_url = profile_url
         self.linkedin_cookie = os.getenv("LINKEDIN_COOKIE")
+        self.gemini_api_key = os.getenv("GEMINI_API_KEY")
+        if self.gemini_api_key:
+            self.genai_client = genai.Client(api_key=self.gemini_api_key)
+        else:
+            self.genai_client = None
+
+    def _summarize_with_gemini(self, text: str) -> str:
+        """Usa a API do Gemini para resumir a notícia em uma única frase (manchete)."""
+        if not self.genai_client:
+            return text
+        try:
+            prompt = f"Resuma o seguinte texto de uma postagem do LinkedIn em uma única frase de impacto curta (máximo 15 palavras), como uma manchete de TV (em português). Remova aspas e quebras de linha: {text}"
+            response = self.genai_client.models.generate_content(
+                model='gemini-1.5-flash',
+                contents=prompt
+            )
+            if response.text:
+                return response.text.strip().replace('"', '').replace('\n', ' ')
+            return text
+        except Exception as e:
+            logging.error(f"Erro ao usar Gemini API: {e}")
+            return text
 
     def get_news(self) -> List[Dict[str, str]]:
         """
@@ -65,7 +88,8 @@ class LinkedInSuapeScraper(Scraper):
                         image_url = image_element.get_attribute("src")
 
                         if headline and image_url:
-                            news_list.append({"headline": headline, "image_url": image_url})
+                            headline_summary = self._summarize_with_gemini(headline)
+                            news_list.append({"headline": headline_summary, "image_url": image_url})
                     except PlaywrightTimeoutError:
                         logging.warning("Timeout ao extrair dados de um post individual do LinkedIn. Pulando.")
                         continue
